@@ -22,7 +22,6 @@ from typing import List, Text
 
 import tensorflow as tf
 
-from google.protobuf import json_format
 from google.protobuf import text_format
 from google.protobuf.message import Message
 from tensorflow.python.lib.io import file_io  # pylint: disable=g-direct-tensorflow-import
@@ -116,13 +115,6 @@ def parse_pbtxt_file(file_name: Text, message: Message) -> Message:
   """Parses a protobuf message from a text file and return message itself."""
   contents = file_io.read_file_to_string(file_name)
   text_format.Parse(contents, message)
-  return message
-
-
-def parse_json_file(file_name: Text, message: Message) -> Message:
-  """Parses a protobuf message from a JSON file and return itself."""
-  contents = file_io.read_file_to_string(file_name)
-  json_format.Parse(contents, message)
   return message
 
 

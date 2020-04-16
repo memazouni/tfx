@@ -552,14 +552,15 @@ class Executor(base_executor.BaseExecutor):
   class _ToArrowRecordBatchesFn(beam.DoFn):
     """Converts a batch of serialized examples to an Arrow RecordBatch."""
 
-    def __init__(self, schema: Optional[schema_pb2.Schema]):
-      self._serialized_schema = schema.SerializeToString() if schema else None
+    __slots__ = ['_serialized_schema', '_decoder']
+
+    def __init__(self, schema: schema_pb2.Schema):
+      self._serialized_schema = schema.SerializeToString()  # pylint: disable=assigning-non-slot
 
     def setup(self):
-      args = ([] if self._serialized_schema is None
-              else [self._serialized_schema])
-      self._decoder = (
-          tfx_bsl.coders.example_coder.ExamplesToRecordBatchDecoder(*args))
+      self._decoder = (  # pylint: disable=assigning-non-slot
+          tfx_bsl.coders.example_coder.ExamplesToRecordBatchDecoder(
+              self._serialized_schema))
 
     def process(self, element: List[bytes]) -> Iterable[pa.RecordBatch]:
       yield self._decoder.DecodeBatch(element)
@@ -571,7 +572,7 @@ class Executor(base_executor.BaseExecutor):
   @beam.typehints.with_output_types(pa.RecordBatch)
   def _ToArrowRecordBatches(
       pcoll: beam.pvalue.PCollection,
-      schema: Optional[schema_pb2.Schema]) -> beam.pvalue.PCollection:
+      schema: schema_pb2.Schema) -> beam.pvalue.PCollection:
     """Converts serialized examples to Arrow RecordBatches.
 
     Args:
@@ -973,6 +974,10 @@ class Executor(base_executor.BaseExecutor):
       Status of the execution.
     """
     if use_tfxio:
+      # TODO(zhuo): add support for sequence example on par with the non-TFXIO
+      # path. Currently what's missing is to compute pre-transform stats as if
+      # they are tf.Examples
+      assert not self._IsDataFormatSequenceExample(raw_examples_data_format)
       self._AssertSameTFXIOSchema(analyze_data_list)
       feature_spec_or_typespec = (
           analyze_data_list[0].tfxio.TensorAdapter().OriginalTypeSpecs())
@@ -980,12 +985,10 @@ class Executor(base_executor.BaseExecutor):
       feature_spec_or_typespec = schema_utils.schema_as_feature_spec(
           _GetSchemaProto(input_dataset_metadata)).feature_spec
 
-    # TODO(zhuo): no need to convert the return values to list once TFT post
-    # 0.21.2 is released.
-    analyze_input_columns = list(tft.get_analyze_input_columns(
-        preprocessing_fn, feature_spec_or_typespec))
-    transform_input_columns = list(tft.get_transform_input_columns(
-        preprocessing_fn, feature_spec_or_typespec))
+    analyze_input_columns = tft.get_analyze_input_columns(
+        preprocessing_fn, feature_spec_or_typespec)
+    transform_input_columns = tft.get_transform_input_columns(
+        preprocessing_fn, feature_spec_or_typespec)
     # Use the same dataset (same columns) for AnalyzeDataset and computing
     # pre-transform stats so that the data will only be read once for these
     # two operations.
@@ -1075,26 +1078,10 @@ class Executor(base_executor.BaseExecutor):
         for dataset in analyze_data_list:
           infix = 'AnalysisIndex{}'.format(dataset.index)
           if use_tfxio:
-            if self._ShouldDecodeAsRawExample(raw_examples_data_format):
-              serialized = (
-                  pipeline | 'TFXIOReadRawRecords[{}]'.format(infix) >>
-                  dataset.tfxio.origin.RawRecordBeamSource())
-              dataset.standardized = (
-                  serialized
-                  | 'TFXIODecodeRawRecords[{}]'.format(infix) >>
-                  dataset.tfxio.origin.RawRecordToRecordBatch(
-                      desired_batch_size))
-              # dataset.serialized should be a
-              # PCollection[Tuple[Optional[str], str]]
-              dataset.serialized = (
-                  serialized
-                  | 'AddKeyToRawRecords[{}]'.format(infix) >> beam.Map(
-                      lambda x: (None, x)))
-            else:
-              dataset.standardized = (
-                  pipeline
-                  | 'TFXIOReadAndDecode[{}]'.format(infix) >>
-                  dataset.tfxio.BeamSource(desired_batch_size))
+            dataset.standardized = (
+                pipeline
+                | 'TFXIOReadAndDecode[{}]'.format(infix) >>
+                dataset.tfxio.BeamSource(desired_batch_size))
           else:
             dataset.serialized = (
                 pipeline
@@ -1193,12 +1180,9 @@ class Executor(base_executor.BaseExecutor):
                 transform_output_path,
                 tft.TFTransformOutput.PRE_TRANSFORM_FEATURE_STATS_PATH)
 
-            if self._IsDataFormatSequenceExample(raw_examples_data_format):
-              schema_proto = None
-            else:
-              schema_proto = _GetSchemaProto(
-                  input_dataset_metadata
-                  if use_tfxio else analyze_input_dataset_metadata)
+            schema_proto = _GetSchemaProto(
+                input_dataset_metadata
+                if use_tfxio else analyze_input_dataset_metadata)
 
             if not use_tfxio:
               for dataset in analyze_data_list:
@@ -1208,24 +1192,11 @@ class Executor(base_executor.BaseExecutor):
                     | 'ToArrowRecordBatches[{}]'.format(infix)
                     >> self._ToArrowRecordBatches(schema_proto))
 
-            if use_tfxio and self._IsDataFormatSequenceExample(
-                raw_examples_data_format):
-              # Make use of the fact that tf.SequenceExample is wire-format
-              # compatible with tf.Example
-              stats_input = []
-              for dataset in analyze_data_list:
-                infix = 'AnalysisIndex{}'.format(dataset.index)
-                stats_input.append(
-                    dataset.serialized
-                    | 'DecodeSequenceExamplesAsExamplesIntoRecordBatches[{}]'
-                    .format(infix) >> self._ToArrowRecordBatches(schema_proto))
-            else:
-              stats_input = [
-                  dataset.standardized for dataset in analyze_data_list]
-
             pre_transform_stats_options = (
                 transform_stats_options.get_pre_transform_stats_options())
-            (stats_input
+            ([
+                dataset.standardized for dataset in analyze_data_list
+            ]
              | 'FlattenAnalysisDatasets' >> beam.Flatten(pipeline=pipeline)
              | 'GenerateStats[FlattenedAnalysisDataset]' >> self._GenerateStats(
                  pre_transform_feature_stats_path,

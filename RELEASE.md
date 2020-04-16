@@ -3,26 +3,6 @@
 ## Major Features and Improvements
 
 ## Bug fixes and other changes
-*   Depends on `kubernetes>=10.0.1,<12`.
-
-### Deprecations
-
-## Breaking changes
-
-### For pipeline authors
-
-### For component authors
-
-## Documentation updates
-
-# Version 0.21.4
-
-## Major Features and Improvements
-
-## Bug fixes and other changes
-*   Fixed InfraValidator signal handling bug on BeamDagRunner.
-*   Dropped "Type" suffix from primitive type artifact names (Integer, Float,
-    String, Bytes).
 
 ### Deprecations
 
@@ -66,8 +46,6 @@
     Underscores will be supported as well.
 *   Fixed ill-formed underscore in the markdown visualization when running on
     KFP.
-*   Enabled per-component control for caching with enable_cache argument in
-    each component.
 
 ### Deprecations
 

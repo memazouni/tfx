@@ -75,8 +75,7 @@ class Pusher(base_component.BaseComponent):
       custom_executor_spec: Optional[executor_spec.ExecutorSpec] = None,
       output: Optional[types.Channel] = None,
       model_export: Optional[types.Channel] = None,
-      instance_name: Optional[Text] = None,
-      enable_cache: Optional[bool] = None):
+      instance_name: Optional[Text] = None):
     """Construct a Pusher component.
 
     Args:
@@ -93,18 +92,15 @@ class Pusher(base_component.BaseComponent):
         RuntimeParameter, push_destination should be constructed as a dict with
         the same field names as PushDestination proto message.
       custom_config: A dict which contains the deployment job parameters to be
-        passed to cloud-based training platforms. The [Kubeflow example](
-          https://github.com/tensorflow/tfx/blob/6ff57e36a7b65818d4598d41e584a42584d361e6/tfx/examples/chicago_taxi_pipeline/taxi_pipeline_kubeflow_gcp.py#L278-L285)
-          contains an example how this can be used by custom executors.
+        passed to cloud-based training platforms.  The [Kubeflow
+          example](https://github.com/tensorflow/tfx/blob/master/tfx/examples/chicago_taxi_pipeline/taxi_pipeline_kubeflow.py#L211)
+            contains an example how this can be used by custom executors.
       custom_executor_spec: Optional custom executor spec.
       output: Optional output `standard_artifacts.PushedModel` channel with
         result of push.
       model_export: Backwards compatibility alias for the 'model' argument.
       instance_name: Optional unique instance name. Necessary if multiple Pusher
         components are declared in the same pipeline.
-      enable_cache: Optional boolean to indicate if cache is enabled for the
-        Pusher component. If not specified, defaults to the value
-        specified for pipeline's enable_cache parameter.
     """
     if model_export:
       absl.logging.warning(
@@ -129,5 +125,4 @@ class Pusher(base_component.BaseComponent):
     super(Pusher, self).__init__(
         spec=spec,
         custom_executor_spec=custom_executor_spec,
-        instance_name=instance_name,
-        enable_cache=enable_cache)
+        instance_name=instance_name)

@@ -75,25 +75,12 @@ class BaseNode(with_metaclass(abc.ABCMeta, json_utils.Jsonable)):
     else:
       return node_class_name
 
-  def __init__(self,
-               instance_name: Optional[Text] = None,
-               enable_cache: Optional[bool] = None):
-    """Initialize a node.
-
-    Args:
-      instance_name: Optional unique identifying name for this instance of node
-        in the pipeline. Required if two instances of the same node are used in
-        the pipeline.
-      enable_cache: Optional boolean to indicate if cache is enabled for this
-        node. If not specified, defaults to the value specified for pipeline's
-        enable_cache parameter.
-    """
+  def __init__(self, instance_name: Optional[Text] = None):
     self._instance_name = instance_name
     self.executor_spec = self.__class__.EXECUTOR_SPEC
     self.driver_class = self.__class__.DRIVER_CLASS
     self._upstream_nodes = set()
     self._downstream_nodes = set()
-    self._enable_cache = enable_cache
 
   def to_json_dict(self) -> Dict[Text, Any]:
     """Convert from an object to a JSON serializable dictionary."""
@@ -162,11 +149,3 @@ class BaseNode(with_metaclass(abc.ABCMeta, json_utils.Jsonable)):
 
   def add_downstream_node(self, downstream_node):
     self._downstream_nodes.add(downstream_node)
-
-  @property
-  def enable_cache(self) -> bool:
-    return self._enable_cache
-
-  @enable_cache.setter
-  def enable_cache(self, enable_cache):
-    self._enable_cache = enable_cache
