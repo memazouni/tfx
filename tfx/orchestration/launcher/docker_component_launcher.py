@@ -25,6 +25,7 @@ import docker
 
 from tfx import types
 from tfx.components.base import executor_spec
+from tfx.dsl.components import structures
 from tfx.orchestration.config import base_component_config
 from tfx.orchestration.config import docker_component_config
 from tfx.orchestration.launcher import base_component_launcher
@@ -43,8 +44,9 @@ class DockerComponentLauncher(base_component_launcher.BaseComponentLauncher):
         component_config, docker_component_config.DockerComponentConfig):
       return False
 
-    return isinstance(component_executor_spec,
-                      executor_spec.ExecutorContainerSpec)
+    return isinstance(
+        component_executor_spec,
+        (executor_spec.ExecutorContainerSpec, structures.ContainerSpec))
 
   def _run_executor(self, execution_id: int,
                     input_dict: Dict[Text, List[types.Artifact]],

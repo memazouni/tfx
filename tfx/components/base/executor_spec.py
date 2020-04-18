@@ -24,6 +24,7 @@ from typing import List, Text, Type
 from six import with_metaclass
 
 from tfx.components.base import base_executor
+from tfx.dsl.components import structures
 from tfx.utils import json_utils
 
 
@@ -84,3 +85,8 @@ class ExecutorContainerSpec(ExecutorSpec):
     self.command = command
     self.args = args
     super(ExecutorContainerSpec, self).__init__()
+
+
+# This class is needed due to type checking
+class NewExecutorContainerSpec(ExecutorSpec, structures.ContainerSpec):
+  pass
